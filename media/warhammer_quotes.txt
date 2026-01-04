@@ -1,0 +1,26 @@
+WH40K_QUOTES = [
+    '"Pain is an illusion of the senses, despair an illusion of the mind." - Legion of the Damned',
+    '"Walk softly... and carry a big gun." - Force Commander Gabriel Angelos, Blood Ravens',
+    '"Victory requires sacrifice." - Roboute Guilliman',
+    '"We are the Emperor\'s finest." - Captain Titus, Ultramarines',
+    '"Only in death does duty end." - Ultramarines Chapter Motto',
+    '"The weak must be culled." - Fabius Bile',
+    '"Discipline is the foundation of victory." - Captain Cato Sicarius',
+    '"Success is not final, failure is not fatal: it is the courage to continue that counts." - Commissar Yarrick',
+    '"An open mind is like a fortress with its gates unbarred and unguarded." — Librarian Isador',
+    '"The Emperor protects."',
+    '"Faith is purest when it is unquestioned." — Ultramarine Chaplain',
+    '"The Codex Astartes is a set of rules. They guide us, shape us as Ultramarines, teach us to place duty and honour above all. But how we live with those rules is the true test of a Space Marine." - Captain Demetrian Titus'
+    '"Knowledge is power, guard it well." - Inquisitorial Lore',
+    '"For the Emperor!" - Imperial Battle Cry',
+    '"Victory requires sacrifice." - Roboute Guilliman',
+    '"Success is the sum of small efforts." - Roboute Guilliman',
+    '"Never again in life will your actions carry such consequences. Never again will you serve as you serve now." - Grimaldus, Helsreach',
+    '"Blood for the blood god!"',
+    '"Cruel men make cruel warriors make cruel lords. We need to be better." - Dante, Devastation of Baal',
+    '"To the darkness I bring fire. To the ignorant I bring faith. Those who welcome these gifts may live, but I will visit naught but death and eternal suffering." - Grimaldus',
+    '"We are the Defenders of Hell\'s reach. On this day we carve our Legend in the Flesh of every alien we slay." - Grimaldus, Helsreach',
+    '"The weak are culled, the strong endure." - Commissar Yarrick',
+    '"There is always beauty, even in the depths of ugliness, even in the depths of defeat." - Dante, Devastation of Baal',
+    '"It is not the descent toward the shadow nor the rise toward the light that makes us superior. It is the endless struggle between the two that greatness of character lies. We are tested, and we do not break. We will never fall!" - Sanguinius'
+]
