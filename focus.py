@@ -2,6 +2,7 @@
 # Focus Flow - Pomodoro App with To-Do List
 # Req: pip install pygame-ce==2.5.6
 import os
+import sys
 import json
 import random
 import tkinter as tk
@@ -14,12 +15,15 @@ from dataclasses import dataclass
 from tkinter import simpledialog, messagebox
 import pygame as pg
 
+# change to run dir
+os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
+
 # Config
 APP_TITLE = "Focus Flow - Pomodoro To-Do App"
 APP_ICON = "media/images/6194029.png"
 SAVE_PATH = "cfg/state.json"
 STATS_PATH = "cfg/stats.json"
-SOUND_DIR = "media/alarms"
+SOUND_DIR = "media/alarms/"
 BASE_W, BASE_H = 560, 720
 FPS = 60
 DEFAULT_POMODORO = 25 * 60
@@ -662,6 +666,7 @@ class FocusApp:
     # Main Loop
     def run(self) -> None:
         """Main application loop"""
+
         while True:
             dt = self.clock.tick(FPS)/1000
 
