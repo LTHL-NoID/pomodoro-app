@@ -114,8 +114,8 @@ python3 focus.py
 ## Known Bugs / Notes
 
 - ~~After setting custom timer durations, you may need to click **Start** twice to begin the timer.~~ Fixed
-- Task drag-and-drop may require precise mouse movements to reorder correctly.
-- No visual task drag-and-drop
+- ~~Task drag-and-drop may require precise mouse movements to reorder correctly.~~
+- ~~No visual task drag-and-drop~~
 
 ---
 
