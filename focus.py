@@ -1,4 +1,4 @@
-#!/usr/bin/env python3\
+#!/usr/bin/env python3
 # Focus Flow - Pomodoro App with To-Do List
 # Req: pip install pygame-ce==2.5.6
 """Required imports"""
@@ -20,7 +20,7 @@ os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
 # Config
 APP_TITLE = "Focus Flow - Pomodoro To-Do App"
-APP_ICON = "media/images/6194029.png"
+APP_ICON = "media/images/to-do-list2.png"
 SAVE_PATH = "cfg/state.json"
 CONFIG_PATH = "cfg/config.json"
 STATS_PATH = "cfg/stats.json"
@@ -336,7 +336,9 @@ class Dialogs:
         root.mainloop()
 
     @staticmethod
-    def multiline_task_with_score(initial_text: str = "",initial_score: int = 10) -> tuple[str, int] | None:
+    def multiline_task_with_score(
+        initial_text: str = "",
+        initial_score: int = 10) -> tuple[str, int] | None:
         """Prompt user for multi-line task description and point value in a single modal."""
         root = tk.Tk()
         root.title("New Task / Edit Task")
@@ -345,11 +347,13 @@ class Dialogs:
         root.geometry(f"{w}x{h}")
         Dialogs._center(root, w, h)
         root.resizable(False, False)
+
         # Multi-line text
         tk.Label(root, text="Task Description:", font=("Consolas", 12)).pack(pady=(10, 0))
         text_widget = tk.Text(root, wrap="word", height=6, font=("Consolas", 12))
         text_widget.pack(padx=10, pady=(0, 10), fill="both", expand=True)
         text_widget.insert("1.0", initial_text)
+
         # Points input
         points_var = tk.IntVar(value=initial_score)
         tk.Label(root, text="Task Points:", font=("Consolas", 12)).pack()
@@ -377,7 +381,6 @@ class Dialogs:
         root.mainloop()
 
         return result["value"]
-
 
     @staticmethod
     def _center(root, w, h):
@@ -468,8 +471,9 @@ class FocusApp:
         self.mouse_down_pos = None
         self.last_click_time = 0
         self.last_click_pos = None
+        self.skip_next_click = False
         self.double_click_threshold = 300
-        self.task_padding = 10  # Space between tasks
+        self.task_padding = 10  # Space between tasks adjustment
 
         # Buttons
         self.btn_start = Button(pg.Rect(20, 100, 80, 40), "Start")
@@ -479,8 +483,17 @@ class FocusApp:
         self.btn_stats = Button(pg.Rect(415, 100, 60, 40), "Stats")
         self.btn_reset = Button(pg.Rect(485, 100, 60, 40), "Reset")
         self.btn_back = Button(pg.Rect(BASE_W - 120, 20, 100, 40), "← Back")
-
         self.clock = pg.time.Clock()
+
+    def get_task_y(self, idx):
+        """Return the y position of a task given its index"""
+        y = 220
+        for i, t in enumerate(self.tasks.tasks):
+            row_h = max(28, len(self._wrap(t.text, self.screen.get_width()-150))*18)
+            if i == idx:
+                return y
+            y += row_h + self.task_padding
+        return y
 
     def _load_config(self):
         """Load custom session/break times if they exist"""
@@ -574,7 +587,6 @@ class FocusApp:
                 return
             y += row_h + self.task_padding
 
-
     # Drawing functions
     def draw_splash(self) -> None:
         """Splash screen"""
@@ -638,13 +650,22 @@ class FocusApp:
             lines = self._wrap(task.text, self.screen.get_width()-150)
             row_h = max(28, len(lines)*18)
             total_h = row_h + self.task_padding
-            # Highlight first
+
+            # Hover highlight
+            extra_bottom = 4 if len(lines) > 1 else 0  # extra space for multi-line tasks
             if i == self.hover:
                 pg.draw.rect(
                     self.screen,
                     COLOR_TASK_HIGHLIGHT,
-                    (20, y -4, self.screen.get_width()-85, row_h)
-                    )
+                    (20, y -4, self.screen.get_width()-85, row_h + extra_bottom)
+                )
+
+            # Dragging highlight (dimmed)
+            if self.dragging_task == i:
+                extra_bottom = 4 if len(lines) > 1 else 0  # same as hover
+                surf = pg.Surface((self.screen.get_width()-85, row_h + extra_bottom), pg.SRCALPHA)
+                surf.fill((70, 140, 80, 100))  # RGBA for dim
+                self.screen.blit(surf, (20, y - 4))   # match hover y offset
 
             # Checkbox
             box_size = 20
@@ -664,18 +685,21 @@ class FocusApp:
                     (box.right-4, box.top+4),3)
 
             # Task text
-            text_y = box_y + (box_size - 18)//0.6
+            line_height = 18
+            text_y = box_y + (box_size - line_height)//2 
             for li, line in enumerate(lines):
                 surf = self.font_s.render(line, True, COLOR_DIM if task.complete else COLOR_TEXT)
-                self.screen.blit(surf, (60, text_y + li*18))
-                if task.complete:
-                    ystrike = text_y + li*18 + surf.get_height()//2 - 2
-                    pg.draw.line(
-                        self.screen,
-                        COLOR_DIM,
-                        (60, ystrike),
-                        (60+surf.get_width(),
-                        ystrike),1)
+                self.screen.blit(surf, (60, text_y + li*line_height))
+
+            # Strike-through for completed tasks
+            if task.complete:
+                ystrike = text_y + li*line_height + surf.get_height()//2 - 2
+                pg.draw.line(
+                    self.screen,
+                    COLOR_DIM,
+                    (60, ystrike),
+                    (60+surf.get_width(),
+                    ystrike),1)
 
             # Task score
             score_surf = self.font_s.render(
@@ -739,7 +763,7 @@ class FocusApp:
             stats_lines.append(
                 f"  {day_name}: {self.stats.stats['daily_records'].get(day,0)} sessions | {self.stats.stats['daily_task_scores'].get(day,0)} pts"
                 )
-            
+
         y = 50
         for line in stats_lines:
             color = COLOR_DIM if line.startswith(" ") else COLOR_TEXT
@@ -780,26 +804,47 @@ class FocusApp:
                             self.dragging_task = self.task_at(self.mouse_down_pos)
 
                 if e.type == pg.MOUSEBUTTONDOWN and e.button == 1:
+                    if self.skip_next_click:
+                        self.skip_next_click = False
+                        continue  # ignore this click entirely
                     self.mouse_down_pos = e.pos
                     idx = self.task_at(e.pos)
                     now = pg.time.get_ticks()
+                    self.skip_next_click = False
 
                     if idx is not None:
-                        if self.last_click_pos==idx and now-self.last_click_time<=self.double_click_threshold:
-                            t=self.tasks.tasks[idx]
-                            res = threaded_dialog(Dialogs.multiline_task_with_score)
+                        if self.last_click_pos == idx and now - self.last_click_time <= self.double_click_threshold:
+                            t = self.tasks.tasks[idx]
+                            res = threaded_dialog(Dialogs.multiline_task_with_score, initial_text=t.text, initial_score=t.score)
 
                             if res:
                                 txt, score = res
-                                self.tasks.tasks.append(Task(text=txt, score=score))
+                                t.text = txt
+                                t.score = score
                                 self.tasks.save()
                                 self._resize_for_tasks()
-                            self.last_click_time = 0; self.last_click_pos = None
-                        else: self.last_click_time = now; self.last_click_pos = idx
+                                self.dragging_task = None
+                                self.mouse_down_pos = None
+
+                            self.last_click_time = 0
+                            self.last_click_pos = None
+                            self.skip_next_click = True
+
+                        else: 
+                            self.last_click_time = now
+                            self.last_click_pos = idx
 
                     if self.mode == AppMode.MAIN:
-                        if self.btn_start.rect.collidepoint(e.pos):
-                            self.timer.start() if not self.timer.running else self.timer.stop()
+                        idx = self.task_at(e.pos)
+                        if idx is not None and not self.skip_next_click:
+                            self.dragging_task = idx
+                            self.drag_offset_y = e.pos[1] - self.get_task_y(idx)
+
+                        elif self.btn_start.rect.collidepoint(e.pos):
+                            if self.timer.running:
+                                self.timer.stop()
+                            else:
+                                self.timer.start()
 
                         elif self.btn_custom.rect.collidepoint(e.pos):
                             # Custom Timer button
@@ -832,9 +877,12 @@ class FocusApp:
                 if e.type==pg.MOUSEBUTTONUP and e.button==1:
                     idx = self.task_at(e.pos)
                     if self.dragging_task is not None and idx is not None and self.dragging_task != idx:
-                        self.tasks.tasks.pop(self.dragging_task)
-                        self.tasks.tasks.insert(idx,t)
+                        task_to_move = self.tasks.tasks.pop(self.dragging_task)
+                        self.tasks.tasks.insert(idx, task_to_move)
                         self.tasks.save()
+
+                        self.dragging_task = None
+                        self.mouse_down_pos = None
 
                     elif self.dragging_task is None and idx is not None and self.mode==AppMode.MAIN:
                         self.edit_or_toggle(e.pos)
@@ -862,7 +910,7 @@ class FocusApp:
                 self._play_alarm()
                 threaded_dialog(Dialogs.finished)
                 pg.mixer.stop()
-                self.stats.record_session(int(self.timer.total))  # record session length
+                self.stats.record_session(int(self.timer.total))  # Record session length
 
                 if self.timer.is_break:
                     self.timer.start_focus_session()

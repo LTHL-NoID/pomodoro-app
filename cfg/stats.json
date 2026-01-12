@@ -4,5 +4,7 @@
   "longest_streak": 0,
   "current_streak": 0,
   "daily_records": {},
-  "daily_task_scores": {}
+  "daily_task_scores": {
+    "2026-01-13": 0
+  }
 }
