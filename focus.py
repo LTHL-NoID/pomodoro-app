@@ -837,8 +837,11 @@ class FocusApp:
                     if self.mode == AppMode.MAIN:
                         idx = self.task_at(e.pos)
                         if idx is not None and not self.skip_next_click:
-                            self.dragging_task = idx
-                            self.drag_offset_y = e.pos[1] - self.get_task_y(idx)
+                            y = self.get_task_y(idx)
+                            box = pg.Rect(30, y, 20, 20)
+                            if not box.collidepoint(e.pos):
+                                self.dragging_task = idx
+                                self.drag_offset_y = e.pos[1] - y
 
                         elif self.btn_start.rect.collidepoint(e.pos):
                             if self.timer.running:
