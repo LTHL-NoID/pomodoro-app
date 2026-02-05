@@ -341,6 +341,7 @@ class Dialogs:
         initial_score: int = 10) -> tuple[str, int] | None:
         """Prompt user for multi-line task description and point value in a single modal."""
         root = tk.Tk()
+        root.withdraw()  # hide until we get window position
         root.title("New Task / Edit Task")
         root.attributes("-topmost", True)
         w, h = 450, 250
@@ -376,6 +377,7 @@ class Dialogs:
         tk.Button(btns, text="OK", width=12, command=ok).pack(side="left", padx=10)
         tk.Button(btns, text="Cancel", width=12, command=cancel).pack(side="left", padx=10)
         root.update()
+        root.deiconify()   # show the window now that it's positioned
         root.lift()
         root.focus_force()
         root.mainloop()
@@ -893,11 +895,32 @@ class FocusApp:
                     self.mouse_down_pos = None
 
                 if e.type==pg.MOUSEBUTTONDOWN and e.button==3 and self.hover is not None and self.mode==AppMode.MAIN:
-                    root=tk.Tk()
-                    root.withdraw()
-                    confirm=messagebox.askyesno("Delete Task?", "Are you sure?", parent=root)
-                    root.destroy()
-                    if confirm:
+                    root = tk.Tk()
+                    root.withdraw() # hide until we get window position
+                    root.title("Delete Task?")
+                    root.attributes("-topmost", True)
+                    w, h = 350, 140
+                    root.geometry(f"{w}x{h}")
+                    Dialogs._center(root, w, h)
+                    root.resizable(False, False)
+                    result = {"value": False}
+                    tk.Label(root, text="Are you sure you want to delete this task?",font=("Consolas", 11), wraplength=w-20).pack(pady=20)
+                    btns = tk.Frame(root)
+                    btns.pack(pady=10)
+                    def yes():
+                        result["value"] = True
+                        root.destroy()
+                    def no():
+                        root.destroy()
+                    tk.Button(btns, text="Yes", width=10, command=yes).pack(side="left", padx=10)
+                    tk.Button(btns, text="No", width=10, command=no).pack(side="left", padx=10)
+                    root.update()
+                    root.deiconify() # show the window now that it's positioned
+                    root.lift()
+                    root.focus_force()
+                    root.mainloop()
+
+                    if result["value"]:
                         self._undo_cache.append(self.tasks.tasks.pop(self.hover))
                         self.tasks.save()
                         self._resize_for_tasks()
