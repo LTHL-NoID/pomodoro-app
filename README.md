@@ -72,7 +72,7 @@ This version adds fully customizable Pomodoro and break durations, improved task
 Run the app:
 
 ```bash
-python3 focus.py
+python3 focus-mono.py
 ```
 
 ---
