@@ -1,0 +1,1 @@
+pyinstaller --onedir --noconsole --icon="media/images/ff.png" --add-data "media;media" --name "FocusFlow" FocusFlow.py
