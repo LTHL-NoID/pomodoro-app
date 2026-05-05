@@ -12,7 +12,6 @@ from enum import Enum
 from typing import List
 from datetime import datetime, timedelta
 from dataclasses import dataclass
-from tkinter import simpledialog, messagebox
 import pygame as pg
 
 # Set working directory
@@ -32,7 +31,6 @@ DEFAULT_POMODORO = 25 * 60
 # Colors
 COLOR_BG = (40, 40, 40)
 COLOR_TEXT = (220, 220, 220)
-COLOR_TEXTDARK = (240, 240, 240)
 COLOR_DIM = (150, 150, 150)
 COLOR_TASK_HIGHLIGHT = (70, 140, 80)
 COLOR_DONE = (90, 160, 90)
@@ -148,7 +146,6 @@ class PomodoroTimer:
         self.is_break = True
         self.remaining = self.total
         self.running = False
-        self.total = self.custom_break * 60
 
     def start_focus_session(self) -> None:
         """Enter pomodoro session"""
@@ -165,8 +162,11 @@ class TaskStore:
     def load(self) -> None:
         """Load tasks"""
         if os.path.exists(SAVE_PATH):
-            with open(SAVE_PATH, "r", encoding="utf-8") as f:
-                self.tasks = [Task(**t) for t in json.load(f).get("tasks", [])]
+            try:
+                with open(SAVE_PATH, "r", encoding="utf-8") as f:
+                    self.tasks = [Task(**t) for t in json.load(f).get("tasks", [])]
+            except Exception as e:
+                print(f"Failed to load tasks: {e}")
 
     def save(self) -> None:
         "Save tasks"
@@ -189,9 +189,12 @@ class StatsStore:
     def load(self) -> None:
         """Load daily task scores"""
         if os.path.exists(STATS_PATH):
-            with open(STATS_PATH, "r", encoding="utf-8") as f:
-                self.stats = json.load(f)
-                self.stats.setdefault("daily_task_scores", {})
+            try:
+                with open(STATS_PATH, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                    self.stats.update(loaded)
+            except Exception as e:
+                print(f"Failed to load stats: {e}")
         self.save()
 
     def save(self) -> None:
@@ -202,12 +205,17 @@ class StatsStore:
 
     def record_session(self, duration_seconds: int) -> None:
         """Save current session"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        already_today = today in self.stats["daily_records"]
+        had_yesterday = yesterday in self.stats["daily_records"]
+        if not already_today and not had_yesterday:
+            self.stats["current_streak"] = 0
         self.stats["total_focus_time"] += duration_seconds
         self.stats["total_sessions"] += 1
         self.stats["current_streak"] += 1
         if self.stats["current_streak"] > self.stats["longest_streak"]:
             self.stats["longest_streak"] = self.stats["current_streak"]
-        today = datetime.now().strftime("%Y-%m-%d")
         self.stats["daily_records"][today] = self.stats["daily_records"].get(today, 0) + 1
         self.save()
 
@@ -245,45 +253,39 @@ def threaded_dialog(func, *args, **kwargs):
 class Dialogs:
     """Handles all user interaction dialogs"""
     @staticmethod
-    def minutes() -> int:
-        """Custom timer def"""
-        root = tk.Tk()
-        root.overrideredirect(True)
-        root.attributes("-topmost", True)
-        Dialogs._center(root, 1, 1)
-        root.update()
-        value = simpledialog.askinteger("Settings", "Minutes:", minvalue=1, parent=root)
-        root.destroy()
-        return value
-
-    @staticmethod
-    def custom_session_break() -> tuple[int, int] | None:
+    def custom_session_break(current_session: int = 25, current_break: int = 5) -> tuple[int, int] | None:
         """Prompt user for custom Pomodoro and break times in minutes."""
         root = tk.Tk()
         root.overrideredirect(True)
         root.attributes("-topmost", True)
-        w, h = 450, 180
+        w, h = 450, 210
         root.geometry(f"{w}x{h}")
         Dialogs._center(root, w, h)
         root.resizable(False, False)
-        # Input vars
-        session_var = tk.IntVar(value=25)
-        break_var = tk.IntVar(value=5)
-        # Lables and entries
+        session_var = tk.IntVar(value=current_session)
+        break_var = tk.IntVar(value=current_break)
         tk.Label(root, text="Focus Session (minutes):", font=("Consolas", 12)).pack(pady=(15, 0))
         tk.Entry(root, textvariable=session_var, width=15, font=("Consolas", 12)).pack(pady=(0, 10))
         tk.Label(root, text="Break (minutes):", font=("Consolas", 12)).pack()
-        tk.Entry(root, textvariable=break_var, width=15, font=("Consolas", 12)).pack(pady=(0, 15))
+        tk.Entry(root, textvariable=break_var, width=15, font=("Consolas", 12)).pack(pady=(0, 5))
+        error_var = tk.StringVar()
+        tk.Label(root, textvariable=error_var, font=("Consolas", 10), fg="red").pack()
         result = {"value": None}
 
         def ok():
-            result["value"] = (session_var.get(), break_var.get())
-            root.destroy()
+            try:
+                s, b = session_var.get(), break_var.get()
+                if s < 1 or b < 1:
+                    error_var.set("Values must be at least 1 minute.")
+                    return
+                result["value"] = (s, b)
+                root.destroy()
+            except tk.TclError:
+                error_var.set("Please enter valid whole numbers.")
 
         def cancel():
             root.destroy()
 
-        # Buttons frame
         btns = tk.Frame(root)
         btns.pack(pady=5)
         tk.Button(btns, text="OK", width=12, command=ok).pack(side="left", padx=10, pady=5)
@@ -294,18 +296,6 @@ class Dialogs:
         root.mainloop()
 
         return result["value"]
-
-    @staticmethod
-    def text(title: str, prompt: str, initial="") -> str:
-        """Text dialog"""
-        root = tk.Tk()
-        root.overrideredirect(True)
-        root.attributes("-topmost", True)
-        Dialogs._center(root, 1, 1)
-        root.update()
-        value = simpledialog.askstring(title, prompt, initialvalue=initial, parent=root)
-        root.destroy()
-        return value
 
     @staticmethod
     def finished() -> None:
@@ -394,18 +384,34 @@ class Dialogs:
         root.geometry(f"{w}x{h}+{wx + (sw - w)//2}+{wy + (sh - h)//2}")
 
     @staticmethod
-    def task_score(initial: str="10") -> int:
-        """Task score tracking"""
+    def confirm_delete() -> bool:
+        """Confirm task deletion."""
         root = tk.Tk()
         root.withdraw()
-        Dialogs._center(root, 300, 120)
-        value = simpledialog.askinteger(
-            "Task Score", "Points for this task:",
-            minvalue=1,
-            initialvalue=int(initial),
-            parent=root)
-        root.destroy()
-        return value
+        root.title("Delete Task?")
+        root.attributes("-topmost", True)
+        w, h = 350, 140
+        root.geometry(f"{w}x{h}")
+        Dialogs._center(root, w, h)
+        root.resizable(False, False)
+        result = {"value": False}
+        tk.Label(root, text="Are you sure you want to delete this task?",
+                 font=("Consolas", 11), wraplength=w-20).pack(pady=20)
+        btns = tk.Frame(root)
+        btns.pack(pady=10)
+        def yes():
+            result["value"] = True
+            root.destroy()
+        def no():
+            root.destroy()
+        tk.Button(btns, text="Yes", width=10, command=yes).pack(side="left", padx=10)
+        tk.Button(btns, text="No", width=10, command=no).pack(side="left", padx=10)
+        root.update()
+        root.deiconify()
+        root.lift()
+        root.focus_force()
+        root.mainloop()
+        return result["value"]
 
 @dataclass
 class Button:
@@ -437,8 +443,6 @@ class Button:
 class FocusApp:
     """Focus application main class"""
     def __init__(self):
-        self.m_screen_width = BASE_W
-        self.m_screen_height = BASE_H
         pg.init()
         pg.mixer.init()
         self._load_config()
@@ -457,8 +461,6 @@ class FocusApp:
         self.timer.default_session = self.custom_pomodoro * 60
         self.timer.custom_break = self.custom_break
         self.timer.reset(total=self.custom_pomodoro * 60)
-        self.timer.custom_break = self.custom_break
-        self.timer.reset(total=self.custom_pomodoro*60)
         self.tasks = TaskStore()
         self.tasks.load()
         self.stats = StatsStore()
@@ -469,6 +471,7 @@ class FocusApp:
 
         # Dragging / click
         self.dragging_task = None
+        self.drag_offset_y = 0
         self.mouse_down_pos = None
         self.last_click_time = 0
         self.last_click_pos = None
@@ -516,15 +519,21 @@ class FocusApp:
             json.dump({"session_minutes": self.custom_pomodoro,
                     "break_minutes": self.custom_break}, f, indent=2)
 
-    def _load_sounds(self) -> List[str]:
+    def _load_sounds(self) -> list:
         if not os.path.exists(SOUND_DIR):
             return []
-        return [os.path.join(SOUND_DIR, f) for f in os.listdir(SOUND_DIR)
-                if f.endswith((".wav", ".mp3", ".ogg"))]
+        sounds = []
+        for f in os.listdir(SOUND_DIR):
+            if f.endswith((".wav", ".mp3", ".ogg")):
+                try:
+                    sounds.append(pg.mixer.Sound(os.path.join(SOUND_DIR, f)))
+                except Exception:
+                    pass
+        return sounds
 
     def _play_alarm(self) -> None:
         if self.sounds:
-            pg.mixer.Sound(random.choice(self.sounds)).play()
+            random.choice(self.sounds).play()
 
     def _get_today_score(self) -> int:
         today = datetime.now().strftime("%Y-%m-%d")
@@ -687,20 +696,13 @@ class FocusApp:
 
             # Task text
             line_height = 18
-            text_y = box_y + (box_size - line_height)//2 
+            text_y = box_y + (box_size - line_height)//2
             for li, line in enumerate(lines):
                 surf = self.font_s.render(line, True, COLOR_DIM if task.complete else COLOR_TEXT)
                 self.screen.blit(surf, (60, text_y + li*line_height))
-
-            # Strike-through for completed tasks
-            if task.complete:
-                ystrike = text_y + li*line_height + surf.get_height()//2 - 2
-                pg.draw.line(
-                    self.screen,
-                    COLOR_DIM,
-                    (60, ystrike),
-                    (60+surf.get_width(),
-                    ystrike),1)
+                if task.complete:
+                    ystrike = text_y + li*line_height + surf.get_height()//2 - 2
+                    pg.draw.line(self.screen, COLOR_DIM, (60, ystrike), (60+surf.get_width(), ystrike), 1)
 
             # Task score
             score_surf = self.font_s.render(
@@ -731,9 +733,7 @@ class FocusApp:
             "• Lose points when you untick completed tasks",
             "• Track daily scores on the Statistics page", "", "Sessions:",
             "• 25 mins focus, 5 mins break (standard or set custom times)",
-            "• After 4 sessions, take a 30 min break","• Track your progress in Stats!", "",
-            "Known Bugs:",
-            "• After setting custom time, need to click on 'Start'\n twice before counter is active"
+            "• After 4 sessions, take a 30 min break","• Track your progress in Stats!",
         ]
         y = 60
         for line in instructions:
@@ -778,7 +778,6 @@ class FocusApp:
             for e in pg.event.get():
                 if e.type == pg.QUIT:
                     self.tasks.save()
-                    self._resize_for_tasks()
                     self.stats.save()
                     return
 
@@ -836,7 +835,6 @@ class FocusApp:
                             self.last_click_pos = idx
 
                     if self.mode == AppMode.MAIN:
-                        idx = self.task_at(e.pos)
                         if idx is not None and not self.skip_next_click:
                             y = self.get_task_y(idx)
                             box = pg.Rect(30, y, 20, 20)
@@ -851,8 +849,7 @@ class FocusApp:
                                 self.timer.start()
 
                         elif self.btn_custom.rect.collidepoint(e.pos):
-                            # Custom Timer button
-                            res = threaded_dialog(Dialogs.custom_session_break)
+                            res = threaded_dialog(Dialogs.custom_session_break, self.custom_pomodoro, self.custom_break)
 
                             if res:
                                 session_min, break_min = res
@@ -878,6 +875,10 @@ class FocusApp:
                         elif self.btn_reset.rect.collidepoint(e.pos):
                             self.timer.reset_full()
 
+                    elif self.mode in (AppMode.INSTRUCTIONS, AppMode.STATS):
+                        if self.btn_back.rect.collidepoint(e.pos):
+                            self.mode = AppMode.MAIN
+
                 if e.type==pg.MOUSEBUTTONUP and e.button==1:
                     idx = self.task_at(e.pos)
                     if self.dragging_task is not None and idx is not None and self.dragging_task != idx:
@@ -894,41 +895,12 @@ class FocusApp:
                     self.mouse_down_pos = None
 
                 if e.type==pg.MOUSEBUTTONDOWN and e.button==3 and self.hover is not None and self.mode==AppMode.MAIN:
-                    root = tk.Tk()
-                    root.withdraw() # hide until we get window position
-                    root.title("Delete Task?")
-                    root.attributes("-topmost", True)
-                    w, h = 350, 140
-                    root.geometry(f"{w}x{h}")
-                    Dialogs._center(root, w, h)
-                    root.resizable(False, False)
-                    result = {"value": False}
-                    tk.Label(root, text="Are you sure you want to delete this task?",font=("Consolas", 11), wraplength=w-20).pack(pady=20)
-                    btns = tk.Frame(root)
-                    btns.pack(pady=10)
-                    def yes():
-                        result["value"] = True
-                        root.destroy()
-                    def no():
-                        root.destroy()
-                    tk.Button(btns, text="Yes", width=10, command=yes).pack(side="left", padx=10)
-                    tk.Button(btns, text="No", width=10, command=no).pack(side="left", padx=10)
-                    root.update()
-                    root.deiconify() # show the window now that it's positioned
-                    root.lift()
-                    root.focus_force()
-                    root.mainloop()
-
-                    if result["value"]:
+                    if threaded_dialog(Dialogs.confirm_delete):
                         self._undo_cache.append(self.tasks.tasks.pop(self.hover))
+                        if len(self._undo_cache) > 20:
+                            self._undo_cache.pop(0)
                         self.tasks.save()
                         self._resize_for_tasks()
-
-                if e.type==pg.MOUSEBUTTONDOWN and e.button==1:
-                    if self.mode in (
-                        AppMode.INSTRUCTIONS, AppMode.STATS
-                        ) and self.btn_back.rect.collidepoint(e.pos):
-                        self.mode=AppMode.MAIN
 
             # Timer update
             if self.mode==AppMode.MAIN and self.timer.update(dt):
@@ -939,12 +911,8 @@ class FocusApp:
 
                 if self.timer.is_break:
                     self.timer.start_focus_session()
-                    self.timer.total = self.custom_pomodoro*60
-                    self.timer.remaining = self.timer.total
                 else:
                     self.timer.complete_session()
-                    self.timer.total = self.custom_break*60
-                    self.timer.remaining = self.timer.total
 
             if self.mode==AppMode.SPLASH:
                 self.draw_splash()
